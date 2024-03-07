@@ -474,6 +474,7 @@ resource "google_storage_bucket_object" "pyspark_jars_upload_to_gcs" {
 
 resource "google_composer_environment" "cloud_composer_env_creation" {
   name   = "${local.project_id}-cc2"
+  project = local.project_id
   region = local.location
   provider = google-beta
   config {
@@ -500,9 +501,7 @@ resource "google_composer_environment" "cloud_composer_env_creation" {
     }
   }
 
-  depends_on = [
-    google_storage_bucket.s8s_data_and_code_bucket_creation
-  ] 
+  depends_on = [time_sleep.sleep_after_network_and_firewall_creation] 
 
   timeouts {
     create = "75m"
