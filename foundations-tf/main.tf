@@ -217,6 +217,12 @@ resource "google_project_service" "enable_datacatalog_google_apis" {
   disable_dependent_services = true
 }
 
+resource "google_project_service" "enable_duetai_google_apis" {
+  project = var.project_id
+  service = "cloudaicompanion.googleapis.com"
+  disable_dependent_services = true
+}
+
 /*******************************************
 Introducing sleep to minimize errors from
 dependencies having not completed
@@ -246,6 +252,7 @@ resource "time_sleep" "sleep_after_api_enabling" {
     google_project_service.enable_cloudfunctions_google_apis,
     google_project_service.enable_run_google_apis,
     google_project_service.enable_datalineage_google_apis,
-    google_project_service.enable_datacatalog_google_apis
+    google_project_service.enable_datacatalog_google_apis,
+    google_project_service.enable_duetai_google_apis
   ]
 }

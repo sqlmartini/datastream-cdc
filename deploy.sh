@@ -1,23 +1,24 @@
 #Configure project you want to deploy to
-export PROJECT_ID="enter your project id here"
-cd ~/repos/cdf-private/core-tf/scripts
+export PROJECT_ID="amm-dataform"
+cd ~/repos/gcp_analytics_demo/core-tf/scripts
 source 1-config.sh
 
 #Run Terraform for organization policy edits and enabling Google APIs
-cd ~/repos/cdf-private/foundations-tf
+cd ~/repos/gcp_analytics_demo/foundations-tf
 terraform init
 terraform apply \
   -var="project_id=${PROJECT_ID}" \
   -auto-approve
 
 #Set Terraform variables
-cd ~/repos/cdf-private/core-tf/terraform
+cd ~/repos/gcp_analytics_demo/core-tf/terraform
 PROJECT_NBR=`gcloud projects describe $PROJECT_ID | grep projectNumber | cut -d':' -f2 |  tr -d "'" | xargs`
 GCP_ACCOUNT_NAME=`gcloud auth list --filter=status:ACTIVE --format="value(account)"`
 GCP_REGION="us-central1"
 CDF_NAME="cdf1"
 CDF_VERSION="BASIC"
 CDF_RELEASE="6.10.0"
+CLOUD_COMPOSER_IMAGE_VERSION="composer-2.6.2-airflow-2.6.3"
 
 #Run the Terraform for provisioning the rest of the environment
 terraform init
@@ -29,28 +30,30 @@ terraform apply \
   -var="cdf_name=${CDF_NAME}" \
   -var="cdf_version=${CDF_VERSION}" \
   -var="cdf_release=${CDF_RELEASE}" \
+  -var="cloud_composer_image_version=${CLOUD_COMPOSER_IMAGE_VERSION}" \
   -auto-approve
 
 #Download AdventureWorks sample database
-mkdir ~/repos/cdf-private/core-tf/database
-cd ~/repos/cdf-private/core-tf/database
+cd ~/repos/gcp_analytics_demo/core-tf/
+mkdir database
+cd ~/repos/gcp_analytics_demo/core-tf/database
 curl -LJO https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2022.bak
 
 #Import sample database to Cloud SQL
-cd ~/repos/cdf-private/core-tf/scripts
+cd ~/repos/gcp_analytics_demo/core-tf/scripts
 source 2-cloudsql.sh
 
 #Modify compute profile
-cd ~/repos/cdf-private/core-tf/profiles
+cd ~/repos/gcp_analytics_demo/core-tf/profiles
 sed -i "s/<PROJECT_ID>/$PROJECT_ID/g" test-computeprofile.json
 
 #Modify pipeline
-cd ~/repos/cdf-private/core-tf/terraform
+cd ~/repos/gcp_analytics_demo/core-tf/terraform
 IP=$(terraform output -json | jq -r '.sql_proxy_ip.value')
 
-cd ~/repos/cdf-private/core-tf/pipelines
+cd ~/repos/gcp_analytics_demo/core-tf/pipelines
 sed -i "s/<SQL-PROXY-IP>/$IP/g" test-cdap-data-pipeline.json
 
 #Deploy
-cd ~/repos/cdf-private/core-tf/scripts
+cd ~/repos/gcp_analytics_demo/core-tf/scripts
 source 3-datafusion.sh

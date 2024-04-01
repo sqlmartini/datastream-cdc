@@ -21,6 +21,7 @@ cdf_version                 = "${var.cdf_version}"
 cdf_release                 = "${var.cdf_release}"
 bq_datamart_ds              = "adventureworks"
 CDF_GMSA_FQN                = "serviceAccount:service-${local.project_nbr}@gcp-sa-datafusion.iam.gserviceaccount.com"
+CC_GMSA_FQN                 = "service-${local.project_nbr}@cloudcomposer-accounts.iam.gserviceaccount.com"
 GCE_GMSA_FQN                = "${local.project_nbr}-compute@developer.gserviceaccount.com"
 cloudsql_bucket_nm          = "${local.project_id}-cloudsql-backup"
 s8s_data_and_code_bucket    = "s8s_data_and_code_bucket-${local.project_nbr}"
@@ -33,6 +34,7 @@ subnet_resource_uri         = "projects/${local.project_id}/regions/${local.loca
  *****************************************/
 module "umsa_creation" {
   source     = "terraform-google-modules/service-accounts/google"
+  version = "4.2.2"
   project_id = local.project_id
   names      = ["${local.umsa}"]
   display_name = "User Managed Service Account"
@@ -45,6 +47,7 @@ module "umsa_creation" {
 
 module "umsa_role_grants" {
   source                  = "terraform-google-modules/iam/google//modules/member_iam"
+  version = "7.7.1"
   service_account_address = "${local.umsa_fqn}"
   prefix                  = "serviceAccount"
   project_id              = local.project_id
@@ -59,7 +62,9 @@ module "umsa_role_grants" {
     "roles/bigquery.admin",
     "roles/datafusion.runner",
     "roles/iam.serviceAccountUser",
-    "roles/cloudsql.client"
+    "roles/cloudsql.client",
+    "roles/composer.worker",
+    "roles/composer.admin"    
   ]
   depends_on = [module.umsa_creation]
 }
@@ -101,13 +106,32 @@ resource "google_project_iam_binding" "gmsa_role_grants_datalineageproducer" {
   ]
 }
 
+/******************************************
+2c. IAM role grants to Google Managed Service Account for Cloud Composer 2
+ *****************************************/
+
+module "gmsa_role_grants_cc" {
+  source                  = "terraform-google-modules/iam/google//modules/member_iam"
+  version = "7.7.1"
+  service_account_address = "${local.CC_GMSA_FQN}"
+  prefix                  = "serviceAccount"
+  project_id              = local.project_id
+  project_roles = [
+    
+    "roles/composer.ServiceAgentV2Ext",
+  ]
+  depends_on = [
+    module.umsa_role_grants
+  ]
+}
+
 /******************************************************
 3. Service Account Impersonation Grants to Admin User
  ******************************************************/
 
 module "umsa_impersonate_privs_to_admin" {
   source  = "terraform-google-modules/iam/google//modules/service_accounts_iam/"
-
+  version = "7.7.1"
   service_accounts = ["${local.umsa_fqn}"]
   project          = local.project_id
   mode             = "additive"
@@ -130,6 +154,7 @@ module "umsa_impersonate_privs_to_admin" {
 
 module "administrator_role_grants" {
   source   = "terraform-google-modules/iam/google//modules/projects_iam"
+  version = "7.7.1"
   projects = ["${local.project_id}"]
   mode     = "additive"
 
@@ -199,7 +224,7 @@ resource "time_sleep" "sleep_after_identities_permissions" {
  *****************************************/
 module "vpc_creation" {
   source                                 = "terraform-google-modules/network/google"
-  version                                = "~> 4.0"
+  version                                = "9.0.0"
   project_id                             = local.project_id
   network_name                           = local.vpc_nm
   routing_mode                           = "REGIONAL"
@@ -324,6 +349,7 @@ resource "google_bigquery_dataset" "bq_dataset_creation" {
 
 module "sql-db_private_service_access" {
   source        = "terraform-google-modules/sql-db/google//modules/private_service_access"
+  version = "19.0.0"
   project_id    = local.project_id
   vpc_network   = local.vpc_nm
   depends_on = [ 
