@@ -1,0 +1,6 @@
+    config {
+      type: "declaration",
+      database: "amm-dataform",
+      schema: "adventureworks",
+      name: "Product"
+    }

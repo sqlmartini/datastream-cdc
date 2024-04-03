@@ -1,0 +1,7 @@
+{
+    "defaultSchema": "adventureworks",
+    "assertionSchema": "adventureworks_assertions",
+    "warehouse": "bigquery",
+    "defaultDatabase": "amm-dataform",
+    "defaultLocation": "US"
+  }  

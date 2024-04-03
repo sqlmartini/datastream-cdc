@@ -11,7 +11,7 @@ db_password = "P@ssword@111"
 
 # Sink variables
 dataset_name = "adventureworks"
-bucket = "s8s_data_and_code_bucket-272300000818"
+bucket = "s8s_data_and_code_bucket-1001462454132"
 
 def read_config(table):
 

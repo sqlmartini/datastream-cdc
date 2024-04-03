@@ -1,0 +1,15 @@
+config { 
+    type: "table",
+    dependencies: [ "Sales", "Territory" ]
+}
+SELECT
+    b.TerritoryName
+    , SUM(a.TotalDue) as TotalSales
+FROM
+    ${ref("Sales")} a
+INNER JOIN
+    ${ref("Territory")} b
+ON
+    a.TerritoryID = b.TerritoryID
+GROUP BY
+  b.TerritoryName

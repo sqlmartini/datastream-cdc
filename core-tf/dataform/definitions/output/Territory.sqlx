@@ -1,0 +1,10 @@
+config { 
+    type: "view"
+}
+SELECT
+    a.TerritoryID
+    , a.Name as TerritoryName
+    , a.CountryRegionCode
+    , a.Group
+FROM
+    ${ref("adventureworks", "SalesTerritory")} a

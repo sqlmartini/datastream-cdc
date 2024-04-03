@@ -1,0 +1,22 @@
+config { 
+    type: "table"
+}
+SELECT
+    a.ProductID
+    , a.Name as ProductName
+    , c.Name as ProductCategoryName    
+    , b.Name as ProductSubcategoryName    
+    , a.ProductNumber
+    , a.Color
+    , a.ListPrice
+    , a.ProductLine
+FROM
+    ${ref("adventureworks", "Product")} a
+INNER JOIN
+        ${ref("adventureworks", "ProductSubcategory")} b
+ON
+    a.ProductSubcategoryID = b.ProductSubcategoryID
+INNER JOIN
+        ${ref("adventureworks", "ProductCategory")} c
+ON
+    b.ProductCategoryID = c.ProductCategoryID
