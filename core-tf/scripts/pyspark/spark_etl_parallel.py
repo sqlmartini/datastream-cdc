@@ -10,7 +10,7 @@ db_user = "sqlserver"
 db_password = "P@ssword@111"
 
 # Sink variables
-dataset_name = "adventureworks"
+dataset_name = "adventureworks_raw"
 bucket = "s8s_data_and_code_bucket-1001462454132"
 
 def read_config(table):
@@ -57,7 +57,7 @@ spark = SparkSession.builder \
   .appName("ETL Testing")\
   .getOrCreate()
 
-config = read_config("adventureworks.elt_config")
+config = read_config("adventureworks_raw.elt_config")
 
 q = Queue()
 worker_count = 30

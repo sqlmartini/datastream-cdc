@@ -1,10 +1,10 @@
-CREATE TABLE adventureworks.elt_config
+CREATE TABLE adventureworks_raw.elt_config
 (
   sourceTableName STRING,
   targetTableName STRING
 );
 
-INSERT INTO adventureworks.elt_config
+INSERT INTO adventureworks_raw.elt_config
 VALUES 
   ('Sales.SalesOrderHeader', 'SalesOrderHeader'), 
   ('Sales.SalesOrderDetail', 'SalesOrderDetail'),
