@@ -1,5 +1,5 @@
 #Configure project you want to deploy to
-export PROJECT_ID="amm-dataform"
+export PROJECT_ID="amm-cdc"
 cd ~/repos/gcp_analytics_demo/core-tf/scripts
 source 1-config.sh
 
@@ -15,10 +15,6 @@ cd ~/repos/gcp_analytics_demo/core-tf/terraform
 PROJECT_NBR=`gcloud projects describe $PROJECT_ID | grep projectNumber | cut -d':' -f2 |  tr -d "'" | xargs`
 GCP_ACCOUNT_NAME=`gcloud auth list --filter=status:ACTIVE --format="value(account)"`
 GCP_REGION="us-central1"
-CDF_NAME="cdf1"
-CDF_VERSION="BASIC"
-CDF_RELEASE="6.10.0"
-CLOUD_COMPOSER_IMAGE_VERSION="composer-2.6.2-airflow-2.6.3"
 
 #Run the Terraform for provisioning the rest of the environment
 terraform init
@@ -27,10 +23,6 @@ terraform apply \
   -var="project_number=${PROJECT_NBR}" \
   -var="gcp_account_name=${GCP_ACCOUNT_NAME}" \
   -var="gcp_region=${GCP_REGION}" \
-  -var="cdf_name=${CDF_NAME}" \
-  -var="cdf_version=${CDF_VERSION}" \
-  -var="cdf_release=${CDF_RELEASE}" \
-  -var="cloud_composer_image_version=${CLOUD_COMPOSER_IMAGE_VERSION}" \
   -auto-approve
 
 #Download AdventureWorks sample database

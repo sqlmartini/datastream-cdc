@@ -7,7 +7,7 @@ project_id                  = "${var.project_id}"
 project_nbr                 = "${var.project_number}"
 admin_upn_fqn               = "${var.gcp_account_name}"
 location                    = "${var.gcp_region}"
-umsa                        = "cdf-lab-sa"
+umsa                        = "cdc-lab-sa"
 umsa_fqn                    = "${local.umsa}@${local.project_id}.iam.gserviceaccount.com"
 vpc_nm                      = "vpc-main"
 spark_subnet_nm             = "spark-snet"
@@ -16,17 +16,8 @@ composer_subnet_nm          = "composer-snet"
 composer_subnet_cidr        = "10.1.0.0/16"
 compute_subnet_nm           = "compute-snet"
 compute_subnet_cidr         = "10.2.0.0/16"
-cdf_name                    = "${var.cdf_name}"
-cdf_version                 = "${var.cdf_version}"
-cdf_release                 = "${var.cdf_release}"
-bq_datamart_ds              = "adventureworks"
-CDF_GMSA_FQN                = "serviceAccount:service-${local.project_nbr}@gcp-sa-datafusion.iam.gserviceaccount.com"
-CC_GMSA_FQN                 = "service-${local.project_nbr}@cloudcomposer-accounts.iam.gserviceaccount.com"
 GCE_GMSA_FQN                = "${local.project_nbr}-compute@developer.gserviceaccount.com"
 cloudsql_bucket_nm          = "${local.project_id}-cloudsql-backup"
-s8s_data_and_code_bucket    = "s8s_data_and_code_bucket-${local.project_nbr}"
-CLOUD_COMPOSER2_IMG_VERSION = "${var.cloud_composer_image_version}"
-subnet_resource_uri         = "projects/${local.project_id}/regions/${local.location}/subnetworks/${local.spark_subnet_nm}"
 }
 
 /******************************************
@@ -38,7 +29,7 @@ module "umsa_creation" {
   project_id = local.project_id
   names      = ["${local.umsa}"]
   display_name = "User Managed Service Account"
-  description  = "User Managed Service Account for CDF"
+  description  = "User Managed Service Account for CDC"
 }
 
 /******************************************
@@ -56,73 +47,12 @@ module "umsa_role_grants" {
     "roles/iam.serviceAccountTokenCreator",
     "roles/storage.objectViewer",
     "roles/storage.admin",
-    "roles/dataproc.worker",
-    "roles/dataproc.editor",
     "roles/bigquery.dataEditor",
     "roles/bigquery.admin",
-    "roles/datafusion.runner",
     "roles/iam.serviceAccountUser",
     "roles/cloudsql.client",
-    "roles/composer.worker",
-    "roles/composer.admin"    
   ]
   depends_on = [module.umsa_creation]
-}
-
-/******************************************
-2b. IAM role grants to Google Managed 
-Service Account for Cloud Data Fusion
- *****************************************/
-
-resource "google_project_iam_binding" "gmsa_role_grants_serviceagent" {
-  project = local.project_id
-  role    = "roles/datafusion.serviceAgent"
-  members = [
-    "${local.CDF_GMSA_FQN}"
-  ]
-}
-
-resource "google_project_iam_binding" "gmsa_role_grants_serviceaccountuser" {
-  project = local.project_id
-  role    = "roles/iam.serviceAccountUser"
-  members = [
-    "${local.CDF_GMSA_FQN}"
-  ]
-}
-
-resource "google_project_iam_binding" "gmsa_role_grants_cloudsqlclient" {
-  project = local.project_id
-  role    = "roles/cloudsql.client"
-  members = [
-    "${local.CDF_GMSA_FQN}"
-  ]
-}
-
-resource "google_project_iam_binding" "gmsa_role_grants_datalineageproducer" {
-  project = local.project_id
-  role    = "roles/datalineage.producer"
-  members = [
-    "${local.CDF_GMSA_FQN}"
-  ]
-}
-
-/******************************************
-2c. IAM role grants to Google Managed Service Account for Cloud Composer 2
- *****************************************/
-
-module "gmsa_role_grants_cc" {
-  source                  = "terraform-google-modules/iam/google//modules/member_iam"
-  version = "7.7.1"
-  service_account_address = "${local.CC_GMSA_FQN}"
-  prefix                  = "serviceAccount"
-  project_id              = local.project_id
-  project_roles = [
-    
-    "roles/composer.ServiceAgentV2Ext",
-  ]
-  depends_on = [
-    module.umsa_role_grants
-  ]
 }
 
 /******************************************************
@@ -162,13 +92,6 @@ module "administrator_role_grants" {
     "roles/storage.admin" = [
       "user:${local.admin_upn_fqn}",
     ]
-    "roles/metastore.admin" = [
-
-      "user:${local.admin_upn_fqn}",
-    ]
-    "roles/dataproc.admin" = [
-      "user:${local.admin_upn_fqn}",
-    ]
     "roles/bigquery.admin" = [
       "user:${local.admin_upn_fqn}",
     ]
@@ -190,9 +113,6 @@ module "administrator_role_grants" {
     "roles/iam.serviceAccountTokenCreator" = [
       "user:${local.admin_upn_fqn}",
     ]
-    "roles/composer.admin" = [
-      "user:${local.admin_upn_fqn}",
-    ]
   }
   depends_on = [
     module.umsa_role_grants,
@@ -211,11 +131,7 @@ resource "time_sleep" "sleep_after_identities_permissions" {
     module.umsa_creation,
     module.umsa_role_grants,
     module.umsa_impersonate_privs_to_admin,
-    module.administrator_role_grants,
-    google_project_iam_binding.gmsa_role_grants_serviceagent,
-    google_project_iam_binding.gmsa_role_grants_serviceaccountuser,
-    google_project_iam_binding.gmsa_role_grants_cloudsqlclient,
-    google_project_iam_binding.gmsa_role_grants_datalineageproducer
+    module.administrator_role_grants
   ]
 }
 
@@ -274,20 +190,6 @@ resource "google_compute_firewall" "allow_intra_snet_ingress_to_any" {
   depends_on = [module.vpc_creation]
 }
 
-/******************************************
-7. Private IP allocation for Data Fusion
- *****************************************/
-
-resource "google_compute_global_address" "private_ip_alloc" {
-  name          = "datafusion-ip-alloc"
-  project       = local.project_id 
-  address_type  = "INTERNAL"
-  purpose       = "VPC_PEERING"
-  prefix_length = 22
-  network       = module.vpc_creation.network_id
-  depends_on = [module.vpc_creation]
-}
-
 /*******************************************
 Introducing sleep to minimize errors from
 dependencies having not completed
@@ -295,52 +197,8 @@ dependencies having not completed
 resource "time_sleep" "sleep_after_network_and_firewall_creation" {
   create_duration = "120s"
   depends_on = [
-    module.vpc_creation,
-    google_compute_firewall.allow_intra_snet_ingress_to_any,
-    google_compute_global_address.private_ip_alloc
+    module.vpc_creation
   ]
-}
-
-/******************************************
-8a. Data Fusion instance creation
- *****************************************/
-
-resource "google_data_fusion_instance" "create_instance" {
-  name                          = local.cdf_name
-  region                        = local.location
-  type                          = local.cdf_version
-  enable_stackdriver_logging    = true
-  enable_stackdriver_monitoring = true
-  private_instance              = true
-  network_config {
-    network                     = local.vpc_nm
-    ip_allocation               = "${google_compute_global_address.private_ip_alloc.address}/22"
-  }    
-  version                       = local.cdf_release
-  dataproc_service_account      = local.umsa_fqn
-  project                       = var.project_id
-  depends_on = [time_sleep.sleep_after_network_and_firewall_creation]
-}
-
-/******************************************
-8b. Create a peering connection between Data Fusion tenant VPC and Dataproc VPC
- *****************************************/
-
-resource "google_compute_network_peering" "cdf-peering" {
-  name         = "cdf-peering"
-  network      = module.vpc_creation.network_self_link
-  peer_network = "https://www.googleapis.com/compute/v1/projects/${google_data_fusion_instance.create_instance.tenant_project_id}/global/networks/${local.location}-${local.cdf_name}"
-  depends_on = [google_data_fusion_instance.create_instance]
-}
-
-/******************************************
-9. BigQuery dataset creation
-******************************************/
-
-resource "google_bigquery_dataset" "bq_dataset_creation" {
-  dataset_id                  = local.bq_datamart_ds
-  location                    = "US"
-  project                     = local.project_id  
 }
 
 /******************************************
@@ -395,26 +253,8 @@ resource "google_storage_bucket_iam_member" "member" {
 }
 
 /******************************************
-11. Enable private CDF to access private Cloud SQL
+11. Create Cloud SQL Proxy
 ******************************************/
-
-#Create firewall rule to CDF ingress traffic
-resource "google_compute_firewall" "allow_private_cdf" {
-  project   = local.project_id 
-  name      = "allow-private-cdf"
-  network   = local.vpc_nm
-  direction = "INGRESS"
-  source_ranges = ["${google_compute_global_address.private_ip_alloc.address}/22"]
-  allow {
-    protocol = "tcp"
-    ports    = ["22", "1433"] 
-  }
-  description        = "Creates firewall rule to allow ingress from private CDF from port 22 and 1433 (SQL Server)"
-  depends_on = [
-    google_compute_global_address.private_ip_alloc,
-    google_data_fusion_instance.create_instance
-  ]
-}
 
 #Create static internal IP for VM
 module "sql_proxy_address" {
@@ -425,8 +265,7 @@ module "sql_proxy_address" {
   subnetwork = local.compute_subnet_nm
   names      = ["sql-proxy-ip"]
   depends_on = [
-    module.vpc_creation,
-    google_data_fusion_instance.create_instance
+    module.vpc_creation
   ]
 }
 
@@ -463,109 +302,6 @@ resource "google_compute_instance" "sql-proxy" {
 #Output static IP for JDBC connection
 output "sql_proxy_ip" {
   value = tolist(module.sql_proxy_address.addresses)[0]
-}
-
-/******************************************
-11. Spark Code Bucket Creation
-******************************************/
-
-resource "google_storage_bucket" "s8s_data_and_code_bucket_creation" {
-  name                              = local.s8s_data_and_code_bucket
-  project                           = local.project_id 
-  location                          = local.location
-  uniform_bucket_level_access       = true
-  force_destroy                     = true
-  depends_on = [ time_sleep.sleep_after_network_and_firewall_creation ]
-}
-
-resource "google_storage_bucket_object" "pyspark_scripts_upload_to_gcs" {
-  for_each = fileset("../scripts/pyspark/", "*")
-  source = "../scripts/pyspark/${each.value}"
-  name = "scripts/pyspark/${each.value}"
-  bucket = "${local.s8s_data_and_code_bucket}"
-  depends_on = [ google_storage_bucket.s8s_data_and_code_bucket_creation ]
-}
-
-resource "google_storage_bucket_object" "pyspark_jars_upload_to_gcs" {
-  for_each = fileset("../drivers/", "*")
-  source = "../drivers/${each.value}"
-  name = "drivers/${each.value}"
-  bucket = "${local.s8s_data_and_code_bucket}"
-  depends_on = [ google_storage_bucket.s8s_data_and_code_bucket_creation ]
-}
-
-/******************************************
-12. Cloud Composer 2 creation
-******************************************/
-
-resource "google_composer_environment" "cloud_composer_env_creation" {
-  name   = "${local.project_id}-cc2"
-  project = local.project_id
-  region = local.location
-  provider = google-beta
-  config {
-
-    software_config {
-      image_version = local.CLOUD_COMPOSER2_IMG_VERSION 
-      env_variables = {
-        
-        AIRFLOW_VAR_PROJECT_ID = "${local.project_id}"
-        AIRFLOW_VAR_PROJECT_NBR = "${local.project_nbr}"        
-        AIRFLOW_VAR_REGION = "${local.location}"
-        AIRFLOW_VAR_CODE_BUCKET = "${local.s8s_data_and_code_bucket}"
-        AIRFLOW_VAR_BQ_DATASET = "${local.bq_datamart_ds}"
-        AIRFLOW_VAR_METASTORE_DB = "${local.bq_datamart_ds}"
-        AIRFLOW_VAR_SUBNET_URI = "${local.subnet_resource_uri}"
-        AIRFLOW_VAR_UMSA = "${local.umsa}"
-      }
-    }
-
-    node_config {
-      network    = local.vpc_nm
-      subnetwork = local.spark_subnet_nm
-      service_account = local.umsa_fqn
-    }
-  }
-
-  depends_on = [time_sleep.sleep_after_network_and_firewall_creation] 
-
-  timeouts {
-    create = "75m"
-  } 
-}
-
-/*******************************************
-Introducing sleep to minimize errors from
-dependencies having not completed
-********************************************/
-resource "time_sleep" "sleep_after_composer_creation" {
-  create_duration = "300s"
-  depends_on = [
-      google_composer_environment.cloud_composer_env_creation
-  ]
-}
-
-/******************************************
-13. Cloud Composer 2 DAG bucket capture so we can upload DAG to it
-******************************************/
-
-output "CLOUD_COMPOSER_DAG_BUCKET" {
-  value = google_composer_environment.cloud_composer_env_creation.config.0.dag_gcs_prefix
-}
-
-/*******************************************
-14. Upload Airflow DAG to Composer DAG bucket
-******************************************/
-# Remove the gs:// prefix and /dags suffix
-
-resource "google_storage_bucket_object" "airflow_dag_upload_to_cc2_dag_bucket" {
-  for_each = fileset("../scripts/composer-dag/", "*")
-  source = "../scripts/composer-dag/${each.value}"
-  name = "dags/${each.value}"
-  bucket = substr(substr(google_composer_environment.cloud_composer_env_creation.config.0.dag_gcs_prefix, 5, length(google_composer_environment.cloud_composer_env_creation.config.0.dag_gcs_prefix)), 0, (length(google_composer_environment.cloud_composer_env_creation.config.0.dag_gcs_prefix)-10))
-  depends_on = [
-    time_sleep.sleep_after_composer_creation
-  ]
 }
 
 /******************************************

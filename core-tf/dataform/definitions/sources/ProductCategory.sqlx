@@ -1,6 +1,0 @@
-    config {
-      type: "declaration",
-      database: "amm-dataform",
-      schema: "adventureworks",
-      name: "ProductCategory"
-    }
